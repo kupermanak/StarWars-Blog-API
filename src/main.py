@@ -191,7 +191,7 @@ def get_favorites_characters(user_id):
     return jsonify(serialize_fav_user), 200
 
 @app.route("/User/favorites_characters/<int:user_id>", methods=["DELETE"])
-def delete_favorito(user_id):
+def delete_favorito1(user_id):
     del_fav_char = favorites_characters.query.get(user_id)
     if del_fav_char is None:
         raise APIException('Favorito no encontrado', status_code=404)
@@ -223,7 +223,7 @@ def get_favorites_planets(user_id):
     return jsonify(serialize_fav_user), 200
 
 @app.route("/User/favorites_planets/<int:user_id>", methods=["DELETE"])
-def delete_favorito(user_id):
+def delete_favorito2(user_id):
     del_fav_plan = favorite_planets.query.get(user_id)
     if del_fav_plan is None:
         raise APIException('Favorito no encontrado', status_code=404)
@@ -254,7 +254,7 @@ def get_favorites_starships(user_id):
     return jsonify(serialize_fav_user), 200
 
 @app.route("/User/favorites_starships/<int:user_id>", methods=["DELETE"])
-def delete_favorito(user_id):
+def delete_favorito3(user_id):
     del_fav_star = favorite_starships.query.get(user_id)
     if del_fav_star is None:
         raise APIException('Favorito no encontrado', status_code=404)
