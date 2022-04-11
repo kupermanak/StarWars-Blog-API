@@ -10,7 +10,14 @@ from utils import APIException, generate_sitemap
 from admin import setup_admin
 from models import db, User, Planet, Character, Starship, favorite_characters, favorite_planets, favorite_starships
 from sqlalchemy import join, select
+import datetime
 #from models import Person
+
+from flask_jwt_extended import create_access_token
+from flask_jwt_extended import get_jwt_identity
+from flask_jwt_extended import jwt_required
+from flask_jwt_extended import JWTManager
+from flask_bcrypt import Bcrypt
 
 app = Flask(__name__)
 app.url_map.strict_slashes = False
@@ -20,6 +27,9 @@ MIGRATE = Migrate(app, db)
 db.init_app(app)
 CORS(app)
 setup_admin(app)
+
+jwt = JWTManager(app)
+bcrypt = Bcrypt(app)
 
 # Handle/serialize errors like a JSON object
 @app.errorhandler(APIException)
@@ -31,6 +41,75 @@ def handle_invalid_usage(error):
 def sitemap():
     return generate_sitemap(app)
 
+@app.route('/register', methods=["POST"])
+def registro():
+    if request.method == 'POST':
+        username = request.json.get("username", None)
+        email = request.json.get("email", None)
+        password = request.json.get("password", None)
+        is_active = request.json.get("is_active", None)
+
+        if not username:
+            return jsonify({"message": " El usuario es requerido"}), 400
+        if not email:
+            return jsonify({"message": " El email es requerido"}), 400
+        if not password:
+            return jsonify({"message": "La contraseña es requerida"}), 400
+        if not is_active:
+            return jsonify({"message": "Estar activo es requerido"}), 400
+
+        user = User.query.filter_by(email=email).first()
+        if user:
+            return jsonify({"message": "Este nombre de usuario ya existe"}), 400
+
+        user = User()
+        user.email = email
+        user.user = username
+        user.is_active = is_active
+        pw_hash = bcrypt.generate_password_hash(password)
+
+        user.password = pw_hash
+
+        db.session.add(user)
+        db.session.commit()
+
+        return jsonify({"ok": "Gracias. se registro con exito", "status": "true"}), 200
+
+@app.route('/login', methods=['POST'])
+def login():
+    if request.method == 'POST':
+        email = request.json.get("email", None)
+        password = request.json.get("password", None)
+
+        if not email:
+            return jsonify({"message": "Nombre de usuario requerido"}), 400
+        if not password:
+            return jsonify({"message": "Contraseña requerida"}), 400
+
+        user = User.query.filter_by(email=email).first()
+
+        expiracion = datetime.timedelta(days=1)
+        access_token = create_access_token(identity=user.id, expires_delta=expiracion)
+
+        data = {
+            "user": user.serialize(),
+            "token": access_token,
+            "expires": expiracion.total_seconds()*1000
+        }
+
+        return jsonify(data), 200
+
+@app.route('/logout', methods=['DELETE'])
+@jwt_required()
+def logout():
+
+    #jti = get_jwt()["jti"]
+    # now = datetime.now(timezone.utc)
+    # db.session.add(ListaDeTokensBloqueados(jti=jti, created_at=now))
+    # db.session.commit()
+    print("Agregar token a lista de bloqueados en DB")
+
+    return jsonify(message="User logout"), 200
 
 @app.route('/user', methods=['GET'])
 def get_user():
@@ -62,7 +141,7 @@ def get_character():
     characters = list(map(lambda character : character.serialize(), characters))
     return jsonify(characters), 200
 
-@app.route("/people/<int:character_id>")
+@app.route("/people/<int:character_id>", methods=['GET'])
 def get_character_id(character_id):
     characters = Character.query.get(character_id)
     character = characters.serialize()
@@ -114,7 +193,7 @@ def get_planets():
     planets = list(map(lambda planet : planet.serialize(), planets))
     return jsonify(planets), 200
 
-@app.route("/planets/<int:planet_id>")
+@app.route("/planets/<int:planet_id>", methods=['GET'])
 def get_planet_id(planet_id):
     planets = Planet.query.get(planet_id)
     planets = planets.serialize()
@@ -184,6 +263,7 @@ def handle_starship():
     return "ok", 200
 
 @app.route("/User/favorites_characters/<int:user_id>", methods=["GET"])
+@jwt_required()
 def get_favorites_characters(user_id):
     favorites_user = Character.query.join(favorite_characters, favorite_characters.character_id == Character.id).filter(favorite_characters.user_id == user_id).all()
     serialize_fav_user = list(map(lambda favorite_user : favorite_user.serialize(), favorites_user))
@@ -216,6 +296,7 @@ def handle_favorites_characters(user_id):
     return "ok", 200
 
 @app.route("/User/favorites_planets/<int:user_id>", methods=["GET"])
+@jwt_required()
 def get_favorites_planets(user_id):
     favorites_user = Planet.query.join(favorite_planets, favorite_planets.planet_id == Planet.id).filter(favorite_planets.user_id == user_id).all()
     serialize_fav_user = list(map(lambda favorite_user : favorite_user.serialize(), favorites_user))
@@ -247,6 +328,7 @@ def handle_favorites_planets(user_id):
     return "ok", 200
 
 @app.route("/User/favorites_starships/<int:user_id>", methods=["GET"])
+@jwt_required()
 def get_favorites_starships(user_id):
     favorites_user = Starship.query.join(favorite_starships, favorite_starships.starship_id == Starship.id).filter(favorite_starships.user_id == user_id).all()
     serialize_fav_user = list(map(lambda favorite_user : favorite_user.serialize(), favorites_user))
